@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 def fetch_daily_problem():
-    response = requests.get("https://alfa-leetcode-api.onrender.com/daily", timeout=15)
+    response = requests.get("https://alfa-leetcode-api.onrender.com/daily/raw", timeout=15)
     response.raise_for_status()
     return response.json()
 
