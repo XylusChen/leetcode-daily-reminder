@@ -1,9 +1,10 @@
 import requests
 import os
+import json
 from datetime import datetime
 
 def fetch_daily_problem():
-    response = requests.get("https://alfa-leetcode-api.onrender.com/daily/raw", timeout=15)
+    response = requests.get("https://alfa-leetcode-api.onrender.com/daily", timeout=15)
     response.raise_for_status()
     return response.json()
 
@@ -25,22 +26,19 @@ def main():
 
     data = fetch_daily_problem()
 
-    title = data.get("questionTitle", "N/A")
-    difficulty = data.get("difficulty", "N/A")
-    link = f"https://leetcode.com{data.get('questionLink', '')}"
+    daily = data["activeDailyCodingChallengeQuestion"]
+    question = daily["question"]
 
-    stats = data.get("stats", {})
-    # stats comes as a JSON string in the real API response
-    if isinstance(stats, str):
-        import json
-        stats = json.loads(stats)
+    title = question["title"]
+    difficulty = question["difficulty"]
+    link = f"https://leetcode.com{daily['link']}"
 
-    total_accepted = stats.get("totalAccepted", "N/A")
-    total_submissions = stats.get("totalSubmission", "N/A")
-    acceptance_rate = stats.get("acRate", "N/A")
+    stats = json.loads(question["stats"])
+    total_accepted = stats["totalAccepted"]
+    total_submissions = stats["totalSubmission"]
+    acceptance_rate = stats["acRate"]
 
     difficulty_emoji = {"Easy": "🟢", "Medium": "🟡", "Hard": "🔴"}.get(difficulty, "⚪")
-
     today = datetime.utcnow().strftime("%B %d, %Y")
 
     message = (
