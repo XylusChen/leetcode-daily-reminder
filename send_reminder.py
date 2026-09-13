@@ -1,22 +1,49 @@
 import requests
 import os
 import json
+import time
+import random
 from datetime import datetime, timezone
 
+def fetch_with_retry(url, max_retries=5, base_delay=5, timeout=15):
+    """
+    Fetch a URL with exponential backoff + jitter on failure.
+    Retries on 429 (rate limit) and 5xx (server errors) specifically,
+    since those are transient. Other errors (4xx like 404) fail fast.
+    """
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(url, timeout=timeout)
+
+            if response.status_code == 429 or response.status_code >= 500:
+                if attempt == max_retries:
+                    response.raise_for_status()  # give up, raise the real error
+                delay = base_delay * (2 ** (attempt - 1)) + random.uniform(0, 2)
+                print(f"Attempt {attempt} got {response.status_code}. Retrying in {delay:.1f}s...")
+                time.sleep(delay)
+                continue
+
+            response.raise_for_status()  # raises for other 4xx errors immediately
+            return response.json()
+
+        except requests.exceptions.RequestException as e:
+            if attempt == max_retries:
+                raise
+            delay = base_delay * (2 ** (attempt - 1)) + random.uniform(0, 2)
+            print(f"Attempt {attempt} failed ({e}). Retrying in {delay:.1f}s...")
+            time.sleep(delay)
+
+    raise RuntimeError(f"Failed to fetch {url} after {max_retries} attempts")
+
 def fetch_daily_problem():
-    response = requests.get("https://alfa-leetcode-api.onrender.com/daily/raw", timeout=15)
-    response.raise_for_status()
-    return response.json()
+    return fetch_with_retry("https://alfa-leetcode-api.onrender.com/daily/raw")
 
 def fetch_user_profile(username):
-    response = requests.get(f"https://alfa-leetcode-api.onrender.com/{username}/profile", timeout=15)
-    response.raise_for_status()
-    return response.json()
+    return fetch_with_retry(f"https://alfa-leetcode-api.onrender.com/{username}/profile")
 
 def is_solved_today(title_slug, recent_submissions):
     """Check if the daily problem was solved (Accepted) today in UTC."""
     now_utc = datetime.now(timezone.utc)
-    # LeetCode resets at midnight UTC, so today starts at 00:00:00 UTC
     today_midnight_utc = int(datetime(now_utc.year, now_utc.month, now_utc.day, tzinfo=timezone.utc).timestamp())
 
     for submission in recent_submissions:
